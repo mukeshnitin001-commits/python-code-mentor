@@ -273,5 +273,5 @@ if __name__ == '__main__':
         db.create_all()
         seed_data()
         ensure_default_admin()
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 5009))
     app.run(host='0.0.0.0', port=port, debug=True)
