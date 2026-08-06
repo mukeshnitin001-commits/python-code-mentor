@@ -7,7 +7,14 @@ from ai_engine import explain_code, compare_styles, get_ai_provider
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-prod')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///codementor.db')
+# Use Postgres when DATABASE_URL is provided; otherwise fall back to a
+# serverless-writable SQLite file in /tmp (Vercel's CWD is read-only).
+_DB_URL = os.environ.get('DATABASE_URL')
+if not _DB_URL:
+    _DB_URL = 'sqlite:////tmp/codementor.db'
+if _DB_URL.startswith('postgres://'):
+    _DB_URL = _DB_URL.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _DB_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
