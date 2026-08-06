@@ -31,7 +31,10 @@
   </div>
 
   <div class="panel">
-    <h3>👥 Users ({{ users|length }})</h3>
+    <h3>📝 Quiz Questions <a href="{{ url_for('admin_questions') }}" class="btn btn-ghost btn-xs">Manage</a></h3>
+  <p class="muted small">Add and manage A-to-Z quiz questions.</p>
+
+  <h3>👥 Users ({{ users|length }})</h3>
     <table class="table">
       <thead><tr><th>User</th><th>Role</th><th>Actions</th></tr></thead>
       <tbody>

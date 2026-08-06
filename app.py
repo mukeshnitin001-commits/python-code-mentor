@@ -2,7 +2,7 @@ import os
 import json
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
-from models import db, User, Lesson, LessonProgress, CodeSnippet, CodeStyle, StyleExample
+from models import db, User, Lesson, LessonProgress, CodeSnippet, CodeStyle, StyleExample, Question, QuizAttempt
 from ai_engine import explain_code, compare_styles, get_ai_provider
 
 app = Flask(__name__)
@@ -187,6 +187,95 @@ def dashboard():
                            total_lessons=total, completed_count=done, pct=pct,
                            recent=completed_lessons[-5:])
 
+
+# ---------- Code Playground (client-side Pyodide sandbox) ----------
+@app.route('/playground')
+def playground():
+    return render_template('playground.html', user=current_user())
+
+# ---------- Quiz System ----------
+@app.route('/quiz/<int:lesson_id>', methods=['GET'])
+@login_required
+def quiz(lesson_id):
+    lesson = Lesson.query.get(lesson_id)
+    if not lesson:
+        flash('Lesson not found.', 'danger')
+        return redirect(url_for('learn'))
+    questions = Question.query.filter_by(lesson_id=lesson_id).all()
+    if not questions:
+        flash('No quiz questions yet for this lesson.', 'info')
+        return redirect(url_for('lesson', lesson_id=lesson_id))
+    best = QuizAttempt.query.filter_by(user_id=session['user_id'], lesson_id=lesson_id)\
+        .order_by(QuizAttempt.score_pct.desc()).first()
+    return render_template('quiz.html', user=current_user(), lesson=lesson,
+                           questions=questions, best=best)
+
+@app.route('/api/quiz/submit', methods=['POST'])
+@login_required
+def quiz_submit():
+    data = request.get_json(silent=True) or {}
+    lesson_id = data.get('lesson_id')
+    answers = data.get('answers') or {}  # {question_id: chosen_index}
+    questions = Question.query.filter_by(lesson_id=lesson_id).all() if lesson_id else []
+    correct = 0
+    detail = []
+    for q in questions:
+        chosen = answers.get(str(q.id))
+        is_correct = (chosen is not None and int(chosen) == q.correct_index)
+        if is_correct:
+            correct += 1
+        detail.append({'id': q.id, 'text': q.text,
+                       'correct_index': q.correct_index,
+                       'chosen': chosen, 'is_correct': is_correct,
+                       'explanation': q.explanation})
+    total = len(questions)
+    pct = round((correct / total * 100)) if total else 0
+    attempt = QuizAttempt(user_id=session['user_id'], lesson_id=lesson_id,
+                          total=total, correct=correct, score_pct=pct)
+    db.session.add(attempt)
+    db.session.commit()
+    return jsonify({'score': correct, 'total': total, 'pct': pct, 'detail': detail})
+
+# ---------- Admin: Questions ----------
+@app.route('/admin/questions', methods=['GET'])
+@admin_required
+def admin_questions():
+    questions = Question.query.order_by(Question.lesson_id).all()
+    lessons = Lesson.query.order_by(Lesson.order).all()
+    return render_template('admin/questions.html', user=current_user(),
+                           questions=questions, lessons=lessons)
+
+@app.route('/admin/questions/add', methods=['POST'])
+@admin_required
+def admin_question_add():
+    lesson_id = request.form.get('lesson_id') or None
+    text = request.form.get('text', '').strip()
+    options = request.form.get('options', '')  # one per line
+    correct = request.form.get('correct_index', '0')
+    explanation = request.form.get('explanation', '').strip()
+    opts = [o for o in options.splitlines() if o.strip()]
+    if opts and len(opts) >= 2:
+        q = Question(lesson_id=int(lesson_id) if lesson_id else None, text=text,
+                     options=json.dumps(opts),
+                     correct_index=int(correct) if correct.isdigit() else 0,
+                     explanation=explanation)
+        db.session.add(q)
+        db.session.commit()
+        flash('Question added.', 'success')
+    else:
+        flash('Please provide at least 2 options.', 'danger')
+    return redirect(url_for('admin_questions'))
+
+@app.route('/admin/questions/delete/<int:qid>', methods=['POST'])
+@admin_required
+def admin_question_delete(qid):
+    q = Question.query.get(qid)
+    if q:
+        db.session.delete(q)
+        db.session.commit()
+        flash('Question deleted.', 'success')
+    return redirect(url_for('admin_questions'))
+
 # ---------- Admin ----------
 @app.route('/admin')
 @login_required
@@ -273,5 +362,5 @@ if __name__ == '__main__':
         db.create_all()
         seed_data()
         ensure_default_admin()
-    port = int(os.environ.get('PORT', 5009))
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)

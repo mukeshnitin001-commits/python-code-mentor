@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Code Playground{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>💻 Code Playground</h1>
+  <p class="muted">Write and run real Python <strong>right in your browser</strong> (powered by Pyodide — no install needed). Try variables, loops, functions, and more.</p>
+</div>
+
+<div class="pg-layout">
+  <div class="panel">
+    <div class="pg-toolbar">
+      <span class="field-label">Your code</span>
+      <button class="btn btn-primary btn-sm" id="runBtn" onclick="runCode()">▶ Run</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadPG()">Sample</button>
+    </div>
+    <textarea id="pg-code" class="code-input mono" rows="14" spellcheck="false">
+# Try it! Edit and press Run
+name = "Mukesh"
+numbers = [1, 2, 3, 4, 5]
+squares = [n * n for n in numbers]
+
+print(f"Hello, {name}!")
+print("Squares:", squares)
+print("Sum:", sum(numbers))
+
+def greet(who):
+    return f"Welcome, {who}!"
+
+print(greet("future Pythonista"))</textarea>
+  </div>
+
+  <div class="panel">
+    <div class="pg-toolbar">
+      <span class="field-label">Output</span>
+      <span id="pg-status" class="pg-status"></span>
+    </div>
+    <div id="pg-output" class="output-box mono"><p class="muted">Output will appear here…</p></div>
+  </div>
+</div>
+
+<div class="quick-box">
+  <p>💡 <strong>Tip:</strong> the playground runs Python locally in your browser. It supports core Python — ideal for practicing everything you learn in the <a href="{{ url_for('learn') }}">A-to-Z lessons</a>.</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
+<script>
+let pyodideReady = null;
+function initPyodide() {
+  if (!pyodideReady) {
+    pyodideReady = loadPyodide().then(py => {
+      document.getElementById('pg-status').textContent = '✓ Python ready';
+    }).catch(e => {
+      document.getElementById('pg-status').textContent = '⚠ Failed to load Python';
+      console.error(e);
+    });
+  }
+  return pyodideReady;
+}
+initPyodide();
+
+async function runCode() {
+  const outEl = document.getElementById('pg-output');
+  const status = document.getElementById('pg-status');
+  const code = document.getElementById('pg-code').value;
+  status.textContent = '⏳ running…';
+  try {
+    await initPyodide();
+    const py = await pyodideReady;
+    py.setStdout({ batched: t => appendOut(outEl, t, false) });
+    py.setStderr({ batched: t => appendOut(outEl, t, true) });
+    outEl.innerHTML = '';
+    await py.runPythonAsync(code);
+    if (!outEl.textContent.trim()) outEl.innerHTML = '<p class="muted">(no output)</p>';
+    status.textContent = '✓ done';
+  } catch (e) {
+    appendOut(outEl, String(e), true);
+    status.textContent = '⚠ error';
+  }
+}
+
+function appendOut(el, text, isErr) {
+  const pre = document.createElement('div');
+  pre.textContent = text;
+  pre.className = isErr ? 'pg-err' : '';
+  el.appendChild(pre);
+  el.scrollTop = el.scrollHeight;
+}
+
+const PGSAMPLES = [
+`# Working with a dictionary
+grades = {"Alice": 92, "Bob": 78, "Carol": 88}
+for name, score in grades.items():
+    letter = "A" if score >= 90 else "B" if score >= 80 else "C"
+    print(f"{name}: {score} -> {letter}")`,
+`# Recursion: factorial
+def fact(n):
+    if n <= 1:
+        return 1
+    return n * fact(n - 1)
+
+for i in range(1, 7):
+    print(f"factorial({i}) = {fact(i)}")`
+];
+let pi = 0;
+function loadPG() {
+  document.getElementById('pg-code').value = PGSAMPLES[pi % PGSAMPLES.length];
+  pi++;
+}
+</script>
+{% endblock %}

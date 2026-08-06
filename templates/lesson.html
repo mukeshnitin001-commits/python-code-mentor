@@ -8,9 +8,12 @@
   <div class="markdown">
     {{ lesson.content | replace("\n", "<br>") | safe }}
   </div>
+  <div class="row-gap">
   <form method="post" action="{{ url_for('mark_complete', lesson_id=lesson.id) }}">
     <button class="btn btn-primary">Mark Lesson Complete ✓</button>
   </form>
+  <a href="{{ url_for('quiz', lesson_id=lesson.id) }}" class="btn btn-ghost">📝 Take Quiz</a>
+</div>
   <div class="quick-box">
     <p>💡 <strong>Try this:</strong> copy any code example above and paste it into
       <a href="{{ url_for('explain_page') }}">Explain My Code</a> to get a line-by-line breakdown.</p>

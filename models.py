@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
@@ -62,6 +63,37 @@ class StyleExample(db.Model):
     code = db.Column(db.Text, default='')
     lesson_id = db.Column(db.Integer, db.ForeignKey('lessons.id'), nullable=True)
 
+
+
+class Question(db.Model):
+    __tablename__ = 'questions'
+    id = db.Column(db.Integer, primary_key=True)
+    lesson_id = db.Column(db.Integer, db.ForeignKey('lessons.id'), nullable=True)
+    text = db.Column(db.Text, default='')
+    options = db.Column(db.Text, default='[]')
+    correct_index = db.Column(db.Integer, default=0)
+    explanation = db.Column(db.Text, default='')
+
+    def options_list(self):
+        try:
+            return list(__import__('json').loads(self.options or '[]'))
+        except Exception:
+            return []
+
+    def to_dict(self):
+        return {'id': self.id, 'lesson_id': self.lesson_id, 'text': self.text,
+                'options': self.options_list(), 'correct_index': self.correct_index,
+                'explanation': self.explanation}
+
+class QuizAttempt(db.Model):
+    __tablename__ = 'quiz_attempts'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    lesson_id = db.Column(db.Integer, db.ForeignKey('lessons.id'), nullable=True)
+    total = db.Column(db.Integer, default=0)
+    correct = db.Column(db.Integer, default=0)
+    score_pct = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=__import__('datetime').datetime.utcnow)
 
 def seed_data():
     """Seed default Python lessons, A-to-Z curriculum, and style examples."""
@@ -636,5 +668,46 @@ Happy coding, Dr. Nitin! 🐍
     style_map = {'procedural': procedural, 'oop': oop, 'functional': functional}
     for style_key, title, code in examples:
         db.session.add(StyleExample(style_id=style_map[style_key].id, title=title, code=code))
+
+
+    # Seed quiz questions (keyed to lessons by order)
+    lesson_by_order = {l.order: l for l in db.session.query(Lesson).all()}
+    questions = [
+        # Lesson 3: Variables & Data Types (order 3)
+        (3, 'What is the type of 3.14?', ['int', 'float', 'str', 'bool'], 1,
+         'Numbers with a decimal point are floats in Python.'),
+        (3, 'Which of the following is a valid variable name?', ['1var', 'my var', '_count', 'for'], 2,
+         'Variable names can start with an underscore and cannot start with a digit or be a keyword like "for".'),
+        (3, 'What does type(42) return?', ['<class \'str\'>', '<class \'int\'>', '<class \'float\'>', '<class \'list\'>'], 1,
+         'type() shows the type of a value; 42 is an integer.'),
+        # Lesson 6: Lists (order 6)
+        (6, 'What is the index of the first element in a list?', ['1', '-1', '0', 'None'], 2,
+         'Python is 0-indexed: the first element is at index 0.'),
+        (6, 'How do you add an item to the END of a list?', ['.append()', '.push()', '.add()', '.insert(0)'], 0,
+         'Use list.append(item) to add to the end.'),
+        # Lesson 9: Functions (order 9)
+        (9, 'Which keyword defines a function?', ['func', 'def', 'function', 'lambda'], 1,
+         'Functions are defined with the "def" keyword.'),
+        (9, 'What does return do?', ['Prints a value', 'Ends function and sends a value back', 'Restarts the program', 'Deletes a variable'], 1,
+         'return sends a value back to the caller and ends the function.'),
+        # Lesson 12: Loops (order 12)
+        (12, 'Which loop is best when you know how many times to repeat?', ['while', 'for', 'if', 'repeat'], 1,
+         'A for loop over range() is ideal for a known number of repeats.'),
+        # Lesson 18: OOP (order 18)
+        (18, 'What is __init__ used for in a class?', ['To delete an object', 'To define a constructor', 'To import a module', 'To print output'], 1,
+         '__init__ is the constructor method, called when an object is created.'),
+        (18, 'Which keyword creates an object from a class?', ['new', 'create', 'Calling the class name, e.g. Dog()', 'object'], 2,
+         'You create an object by calling the class like a function, e.g., my_dog = Dog().'),
+        # Lesson 21: Dictionaries (order 21)
+        (21, 'How do you get the value for key "name" in dict d?', ['d.name', 'd[name]', 'd.get("name")', 'd["name"] or d.get("name")'], 3,
+         'Use d["name"] or the safer d.get("name") which avoids KeyError.'),
+        (21, 'Which data structure is best for key-value pairs?', ['list', 'tuple', 'dict', 'set'], 2,
+         'Dictionaries store key-value pairs.'),
+    ]
+    for order, text, opts, correct, expl in questions:
+        lid = lesson_by_order.get(order).id if order in lesson_by_order else None
+        db.session.add(Question(lesson_id=lid, text=text,
+                                options=json.dumps(opts), correct_index=correct,
+                                explanation=expl))
 
     db.session.commit()

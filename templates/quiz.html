@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Quiz: {{ lesson.title }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>📝 Quiz — {{ lesson.title }}</h1>
+  <p class="muted">{{ questions|length }} questions. Select an answer for each, then submit.
+    {% if best %}Your best score: <strong>{{ best.score_pct }}%</strong> ({{ best.correct }}/{{ best.total }}).{% endif %}</p>
+</div>
+
+<div id="quiz-wrap">
+  {% for q in questions %}
+  <div class="panel quiz-q" data-id="{{ q.id }}">
+    <h3 class="quiz-text">{{ loop.index }}. {{ q.text }}</h3>
+    <div class="quiz-opts">
+      {% for opt in q.options_list() %}
+      <label class="quiz-opt">
+        <input type="radio" name="q{{ q.id }}" value="{{ loop.index0 }}">
+        <span>{{ opt }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="quiz-actions">
+  <button class="btn btn-primary btn-lg" onclick="submitQuiz({{ lesson.id }})">Submit Answers</button>
+</div>
+
+<div id="quiz-result" class="panel hidden"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function submitQuiz(lessonId) {
+  const answers = {};
+  document.querySelectorAll('.quiz-q').forEach(q => {
+    const sel = q.querySelector('input[type=radio]:checked');
+    if (sel) answers[q.dataset.id] = parseInt(sel.value, 10);
+  });
+  const res = await fetch('/api/quiz/submit', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({lesson_id: lessonId, answers: answers})
+  });
+  const data = await res.json();
+  const box = document.getElementById('quiz-result');
+  const pass = data.pct >= 70;
+  let html = `<h2>${data.score} / ${data.total} correct — <span class="${pass?'green-text':'red-text'}">${data.pct}%</span></h2><p>${pass?'🎉 Passed!':'Keep practicing — review the lesson and try again.'}</p><hr>`;
+  data.detail.forEach(d => {
+    const st = d.is_correct ? '✅' : '❌';
+    html += `<div class="quiz-detail"><strong>${st} ${d.text}</strong>`;
+    if (!d.is_correct) {
+      html += `<div class="muted">Correct answer: ${d.correct_index === 0 ? 'index 0' : d.correct_index} — ${d.explanation||''}</div>`;
+    }
+    if (d.explanation) html += `<div class="muted small">${d.explanation}</div>`;
+    html += `</div>`;
+  });
+  box.innerHTML = html;
+  box.classList.remove('hidden');
+  box.scrollIntoView({behavior:'smooth'});
+}
+</script>
+{% endblock %}

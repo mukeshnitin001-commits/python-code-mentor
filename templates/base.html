@@ -17,6 +17,8 @@
       <a href="{{ url_for('learn') }}">Lessons</a>
       <a href="{{ url_for('explain_page') }}">Explain My Code</a>
       <a href="{{ url_for('compare_page') }}">Compare Styles</a>
+      <a href="{{ url_for('playground') }}">Playground</a>
+      <a href="{{ url_for('learn') }}?quiz=1">Quiz</a>
       {% if user %}
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
         {% if user.role == 'admin' %}<a href="{{ url_for('admin') }}" class="admin-link">Admin</a>{% endif %}

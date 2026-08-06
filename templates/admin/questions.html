@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Admin — Questions{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>📝 Manage Quiz Questions</h1>
+  <p class="muted">Add questions tied to a lesson (or general). Options go one per line; correct answer is by index (0 = first line).</p>
+</div>
+
+<div class="panel">
+  <h3>＋ Add Question</h3>
+  <form method="post" action="{{ url_for('admin_question_add') }}" class="form">
+    <label>Lesson
+      <select name="lesson_id">
+        <option value="">— General —</option>
+        {% for l in lessons %}
+        <option value="{{ l.id }}">{{ l.order }}. {{ l.title }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Question text
+      <input type="text" name="text" required>
+    </label>
+    <label>Options (one per line)
+      <textarea name="options" rows="4" required placeholder="Option A&#10;Option B&#10;Option C"></textarea>
+    </label>
+    <label>Correct index (0-based)
+      <input type="number" name="correct_index" value="0" min="0">
+    </label>
+    <label>Explanation
+      <input type="text" name="explanation">
+    </label>
+    <button class="btn btn-primary">Save Question</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h3>All Questions ({{ questions|length }})</h3>
+  <table class="table">
+    <thead><tr><th>ID</th><th>Lesson</th><th>Question</th><th>Options</th><th></th></tr></thead>
+    <tbody>
+    {% for q in questions %}
+      <tr>
+        <td>{{ q.id }}</td>
+        <td>{{ q.lesson_id or 'General' }}</td>
+        <td>{{ q.text }}</td>
+        <td class="small">{{ q.options_list()|length }} options</td>
+        <td>
+          <form method="post" action="{{ url_for('admin_question_delete', qid=q.id) }}" onsubmit="return confirm('Delete?');">
+            <button class="btn btn-danger btn-xs">Del</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
