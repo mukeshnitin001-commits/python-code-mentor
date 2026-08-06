@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ lesson.title }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('learn') }}">← All lessons</a>
+<article class="lesson-page">
+  <h1>{{ lesson.title }}</h1>
+  <span class="chip">{{ lesson.category }}</span>
+  <div class="markdown">
+    {{ lesson.content | replace("\n", "<br>") | safe }}
+  </div>
+  <form method="post" action="{{ url_for('mark_complete', lesson_id=lesson.id) }}">
+    <button class="btn btn-primary">Mark Lesson Complete ✓</button>
+  </form>
+  <div class="quick-box">
+    <p>💡 <strong>Try this:</strong> copy any code example above and paste it into
+      <a href="{{ url_for('explain_page') }}">Explain My Code</a> to get a line-by-line breakdown.</p>
+  </div>
+</article>
+{% endblock %}

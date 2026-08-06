@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if lesson else 'New' }} Lesson{% endblock %}
+{% block content %}
+<div class="panel" style="max-width: 860px">
+  <h2>{{ 'Edit Lesson' if lesson else 'Create New Lesson' }}</h2>
+  <form method="post" class="form">
+    <label>Title
+      <input type="text" name="title" value="{{ lesson.title if lesson else '' }}" required>
+    </label>
+    <div class="grid-2">
+      <label>Category
+        <select name="category">
+          {% for c in ['basics','setup','control','functions','files','advanced','oop','web','collections','project'] %}
+            <option value="{{ c }}" {% if lesson and lesson.category==c %}selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Order
+        <input type="number" name="order" value="{{ lesson.order if lesson else 0 }}">
+      </label>
+    </div>
+    <label>Content (markdown / plain text, code in ```python blocks```)
+      <textarea name="content" rows="18" class="code-input">{{ lesson.content if lesson else '' }}</textarea>
+    </label>
+    <button class="btn btn-primary">Save Lesson</button>
+    <a href="{{ url_for('admin') }}" class="btn btn-ghost">Cancel</a>
+  </form>
+</div>
+{% endblock %}

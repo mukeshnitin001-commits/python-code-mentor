@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-text">
+    <h1>Learn Python, <span class="accent">A to Z</span> — with a free AI tutor by your side.</h1>
+    <p>Step-by-step lessons, an "Explain My Code" dashboard that teaches what every line means, and side-by-side code style comparison. All powered by a free LLM — no API key needed.</p>
+    <div class="hero-actions">
+      <a href="{{ url_for('learn') }}" class="btn btn-primary btn-lg">Start Learning</a>
+      <a href="{{ url_for('explain_page') }}" class="btn btn-ghost btn-lg">Try Explain My Code</a>
+    </div>
+  </div>
+  <div class="hero-code">
+    <div class="code-card">
+      <div class="code-dots"><span></span><span></span><span></span></div>
+      <pre><code>def greet(name):
+    return f"Hello, {name}!"
+
+print(greet("Mukesh"))</code></pre>
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <div class="feature-card">
+    <div class="feature-icon">📚</div>
+    <h3>A-to-Z Curriculum</h3>
+    <p>30+ guided lessons from your very first <code>print</code> to OOP, files, and real projects.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">🤖</div>
+    <h3>Explain My Code</h3>
+    <p>Paste any code — get a step-by-step meaning and syntax breakdown, line by line.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">⚡</div>
+    <h3>Compare Styles</h3>
+    <p>See two different ways to write the same program: procedural vs. modern idiomatic Python.</p>
+  </div>
+</section>
+{% endblock %}

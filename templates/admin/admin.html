@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>🛡️ Admin Panel</h1>
+  <p class="muted">Manage users, lessons, and community content.</p>
+</div>
+
+<div class="admin-grid">
+  <div class="panel">
+    <h3>📚 Lessons ({{ lessons|length }})</h3>
+    <a href="{{ url_for('lesson_create') }}" class="btn btn-primary btn-sm">+ New Lesson</a>
+    <table class="table">
+      <thead><tr><th>#</th><th>Title</th><th>Cat</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for l in lessons %}
+        <tr>
+          <td>{{ l.order }}</td>
+          <td>{{ l.title }}</td>
+          <td>{{ l.category }}</td>
+          <td class="row-gap-sm">
+            <a class="btn btn-ghost btn-xs" href="{{ url_for('lesson_edit', lesson_id=l.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('lesson_delete', lesson_id=l.id) }}" onsubmit="return confirm('Delete this lesson?');">
+              <button class="btn btn-danger btn-xs">Del</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>👥 Users ({{ users|length }})</h3>
+    <table class="table">
+      <thead><tr><th>User</th><th>Role</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.username }}</td>
+          <td>{{ u.role }}</td>
+          <td class="row-gap-sm">
+            <form method="post" action="{{ url_for('user_toggle', user_id=u.id) }}">
+              <button class="btn btn-ghost btn-xs">Make {{ 'Student' if u.role=='admin' else 'Admin' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('user_delete', user_id=u.id) }}" onsubmit="return confirm('Delete user {{ u.username }}?');">
+              <button class="btn btn-danger btn-xs">Delete</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

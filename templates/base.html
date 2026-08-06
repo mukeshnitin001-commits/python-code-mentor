@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Code Mentor{% endblock %} · Python Learning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('index') }}">
+      <span class="brand-logo">🐍</span> Code<span class="brand-accent">Mentor</span>
+    </a>
+    <nav class="nav">
+      <a href="{{ url_for('learn') }}">Lessons</a>
+      <a href="{{ url_for('explain_page') }}">Explain My Code</a>
+      <a href="{{ url_for('compare_page') }}">Compare Styles</a>
+      {% if user %}
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        {% if user.role == 'admin' %}<a href="{{ url_for('admin') }}" class="admin-link">Admin</a>{% endif %}
+        <a href="{{ url_for('logout') }}" class="btn btn-ghost">Logout ({{ user.username }})</a>
+      {% else %}
+        <a href="{{ url_for('login') }}" class="btn btn-ghost">Login</a>
+        <a href="{{ url_for('register') }}" class="btn btn-primary">Get Started</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  <div class="flash-wrap">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash flash-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <p>🐍 CodeMentor — learn Python A to Z, with a free AI code tutor. Built with Flask + SQLite.</p>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

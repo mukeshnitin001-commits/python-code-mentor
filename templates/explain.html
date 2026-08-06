@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Explain My Code{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>🤖 Explain My Code</h1>
+  <p class="muted">Paste any Python code and get a step-by-step breakdown of what every line means and why the syntax works. Powered by a <strong>free LLM</strong> ({{ provider }}).</p>
+</div>
+
+<div class="ai-grid">
+  <div class="panel">
+    <label class="field-label" for="code">Your Python Code</label>
+    <textarea id="code" class="code-input" rows="12" placeholder="# Paste your Python code here&#10;def add(a, b):&#10;    return a + b&#10;&#10;print(add(2, 3))"></textarea>
+    <div class="row-gap">
+      <button class="btn btn-primary" onclick="runExplain()">✨ Explain This Code</button>
+      <button class="btn btn-ghost" onclick="loadSample()">Load Sample</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <label class="field-label">Explanation</label>
+    <div id="explain-output" class="output-box">
+      <p class="muted">Your step-by-step explanation will appear here…</p>
+    </div>
+    <div id="explain-loading" class="loading hidden">🧠 Thinking… analyzing syntax &amp; meaning…</div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const SAMPLES = [
+`# A simple function example
+def greet(name, greeting="Hello"):
+    message = f"{greeting}, {name}!"
+    return message
+
+print(greet("Mukesh"))
+print(greet("World", "Hi"))`,
+`# FizzBuzz - classic logic challenge
+for i in range(1, 21):
+    if i % 15 == 0:
+        print("FizzBuzz")
+    elif i % 3 == 0:
+        print("Fizz")
+    elif i % 5 == 0:
+        print("Buzz")
+    else:
+        print(i)`,
+`# Working with lists and loops
+numbers = [3, 1, 4, 1, 5, 9, 2, 6]
+evens = [n for n in numbers if n % 2 == 0]
+total = sum(numbers)
+print("Evens:", evens)
+print("Total:", total)`
+];
+let sIdx = 0;
+function loadSample() {
+  document.getElementById('code').value = SAMPLES[sIdx % SAMPLES.length];
+  sIdx++;
+}
+function runExplain() {
+  const code = document.getElementById('code').value;
+  if (!code.trim()) { alert('Please paste some code first.'); return; }
+  const out = document.getElementById('explain-output');
+  const load = document.getElementById('explain-loading');
+  out.innerHTML = ''; load.classList.remove('hidden');
+  fetch('/api/explain', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({code})
+  }).then(r => r.json()).then(d => {
+    load.classList.add('hidden');
+    if (d.error) { out.innerHTML = '<p class="error">' + d.error + '</p>'; return; }
+    out.innerHTML = formatExplanation(d.explanation);
+  }).catch(e => {
+    load.classList.add('hidden');
+    out.innerHTML = '<p class="error">Request failed. Please try again.</p>';
+  });
+}
+function formatExplanation(text) {
+  const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return '<div class="explain-text">' + esc.replace(/\n/g, '<br>') + '</div>';
+}
+</script>
+{% endblock %}

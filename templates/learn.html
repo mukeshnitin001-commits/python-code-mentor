@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Lessons{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>📚 Python A-to-Z Lessons</h1>
+  <p class="muted">Work through them in order. Mark each one complete as you go.</p>
+</div>
+<div class="lesson-list">
+  {% for l in lessons %}
+    <a class="lesson-item" href="{{ url_for('lesson', lesson_id=l.id) }}">
+      <span class="lesson-num">{{ loop.index }}</span>
+      <span class="lesson-body">
+        <span class="lesson-title">{{ l.title }}</span>
+        <span class="lesson-cat">{{ l.category }}</span>
+      </span>
+      {% if progress.get(l.id) %}
+        <span class="badge badge-done">✓ Done</span>
+      {% else %}
+        <span class="badge">Start</span>
+      {% endif %}
+    </a>
+  {% endfor %}
+</div>
+{% endblock %}

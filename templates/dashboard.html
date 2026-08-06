@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Hi, {{ user.username }} 👋</h1>
+  <p class="muted">Your learning dashboard.</p>
+</div>
+
+<div class="stats">
+  <div class="stat-card">
+    <div class="stat-value">{{ completed_count }}/{{ total_lessons }}</div>
+    <div class="stat-label">Lessons completed</div>
+    <div class="progress"><div class="progress-bar" style="width: {{ pct }}%"></div></div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="panel">
+    <h3>Your Progress</h3>
+    {% if recent %}
+    <ul class="plain-list">
+      {% for l in recent %}
+        <li><span class="badge badge-done">✓</span> {{ l.title }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      <p class="muted">No lessons completed yet. <a href="{{ url_for('learn') }}">Start the A-to-Z path</a> →</p>
+    {% endif %}
+  </div>
+  <div class="panel">
+    <h3>Quick Tools</h3>
+    <div class="tool-links">
+      <a href="{{ url_for('explain_page') }}" class="tool-link">🤖 Explain My Code</a>
+      <a href="{{ url_for('compare_page') }}" class="tool-link">⚡ Compare Styles</a>
+      <a href="{{ url_for('learn') }}" class="tool-link">📚 Continue Lessons</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Compare Styles{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>⚡ Compare Two Coding Styles</h1>
+  <p class="muted">Paste a program (or describe a task) and the free AI will show you <strong>two different styles</strong> — procedural vs. modern idiomatic Python — doing the same thing.</p>
+</div>
+
+<div class="panel">
+  <label class="field-label" for="ccode">Your Code / Task</label>
+  <textarea id="ccode" class="code-input" rows="8" placeholder="# Paste code or describe a task, e.g.&#10;# 'sum all even numbers from 1 to 20'"></textarea>
+  <div class="row-gap">
+    <button class="btn btn-primary" onclick="runCompare()">✨ Generate Two Styles</button>
+    <button class="btn btn-ghost" onclick="loadSampleC()">Load Sample</button>
+  </div>
+  <div id="compare-loading" class="loading hidden">🧠 Generating two style variants…</div>
+</div>
+
+<div class="compare-output" id="compare-output">
+  <p class="muted">Two style variants will appear side by side here.</p>
+</div>
+
+<div class="panel">
+  <h3>Saved community snippets</h3>
+  <div class="snippet-list">
+    {% for s in snippets %}
+      <button class="snippet-btn" onclick="useSnippet(`{{ s.content | replace('`','\\`') | e }}`)">{{ s.title }}</button>
+    {% endfor %}
+  </div>
+  {% if not snippets %}<p class="muted">No public snippets yet.</p>{% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const CSAMPLES = [
+`numbers = [5, 12, 8, 21, 3, 17]
+# find the largest number and double all even ones`,
+`# compute the factorial of a number
+n = 7
+result = 1
+for i in range(1, n + 1):
+    result *= i
+print(result)`
+];
+let cIdx = 0;
+function loadSampleC() {
+  document.getElementById('ccode').value = CSAMPLES[cIdx % CSAMPLES.length];
+  cIdx++;
+}
+function useSnippet(code) {
+  document.getElementById('ccode').value = code;
+}
+function runCompare() {
+  const code = document.getElementById('ccode').value;
+  if (!code.trim()) { alert('Please paste some code or a task.'); return; }
+  const out = document.getElementById('compare-output');
+  const load = document.getElementById('compare-loading');
+  load.classList.remove('hidden');
+  out.innerHTML = '';
+  fetch('/api/compare', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({code})
+  }).then(r => r.json()).then(d => {
+    load.classList.add('hidden');
+    if (d.error) { out.innerHTML = '<p class="error">' + d.error + '</p>'; return; }
+    const note = d.note ? '<div class="compare-note">💡 ' + d.note + '</div>' : '';
+    out.innerHTML = note + `
+      <div class="style-row">
+        <div class="style-col">
+          <h3>🔧 Procedural</h3>
+          <pre class="code-block"><code>${esc(d.procedural)}</code></pre>
+        </div>
+        <div class="style-col">
+          <h3>🚀 Modern / Idiomatic</h3>
+          <pre class="code-block"><code>${esc(d.modern)}</code></pre>
+        </div>
+      </div>`;
+  }).catch(e => {
+    load.classList.add('hidden');
+    out.innerHTML = '<p class="error">Request failed. Please try again.</p>';
+  });
+}
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}
