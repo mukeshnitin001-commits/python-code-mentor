@@ -2,7 +2,7 @@ import os
 import json
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
-from models import db, User, Lesson, LessonProgress, CodeSnippet, CodeStyle, StyleExample, Question, QuizAttempt
+from models import db, User, Lesson, LessonProgress, CodeSnippet, CodeStyle, StyleExample, Question, QuizAttempt, seed_data
 from ai_engine import explain_code, compare_styles, get_ai_provider
 
 app = Flask(__name__)
@@ -357,10 +357,13 @@ def user_delete(user_id):
         flash('User deleted.', 'info')
     return redirect(url_for('admin'))
 
+# Initialize schema at import time so it runs on serverless cold starts
+# before the first request (essential for Postgres on Vercel).
+with app.app_context():
+    db.create_all()
+    seed_data()
+    ensure_default_admin()
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        seed_data()
-        ensure_default_admin()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
