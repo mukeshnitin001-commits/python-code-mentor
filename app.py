@@ -265,9 +265,14 @@ def dashboard():
     total = len(all_lessons)
     done = len(completed_lessons)
     pct = round((done / total * 100)) if total else 0
-    return render_template('dashboard.html', user=current_user(),
+    cur = current_user()
+    # Admin sees all registered users in a panel on the dashboard
+    users = None
+    if cur and cur.role == 'admin':
+        users = User.query.order_by(User.created_at.desc()).all()
+    return render_template('dashboard.html', user=cur,
                            total_lessons=total, completed_count=done, pct=pct,
-                           recent=completed_lessons[-5:])
+                           recent=completed_lessons[-5:], users=users)
 
 
 # ---------- Code Playground (client-side Pyodide sandbox) ----------
@@ -475,3 +480,27 @@ with app.app_context():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
+
+@app.route('/admin/export-users')
+@login_required
+@admin_required
+def export_users():
+    from io import BytesIO
+    from flask import send_file
+    from openpyxl import Workbook
+
+    users = User.query.order_by(User.created_at.desc()).all()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Registered Users"
+    ws.append(["ID", "Username", "Email", "Phone", "Role", "Registered On"])
+    for u in users:
+        ws.append([u.id, u.username, u.email or '', u.phone or '', u.role,
+                   u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else ''])
+    for col, width in zip('ABCDEF', [8, 22, 30, 18, 12, 22]):
+        ws.column_dimensions[col].width = width
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name='registered_users.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
