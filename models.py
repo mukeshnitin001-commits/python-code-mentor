@@ -14,6 +14,11 @@ class User(db.Model):
     phone = db.Column(db.String(20), unique=True, nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), default='student')  # student | admin
+    membership = db.Column(db.String(20), default='none')  # none | premium
+    membership_plan = db.Column(db.String(20), nullable=True)  # monthly | annual
+    membership_expires = db.Column(db.DateTime, nullable=True)
+    premium_used = db.Column(db.Integer, default=0)
+    premium_limit = db.Column(db.Integer, default=5)  # trial uses for non-members
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):
@@ -23,7 +28,7 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
-        return {'id': self.id, 'username': self.username, 'email': self.email, 'phone': self.phone, 'role': self.role}
+        return {'id': self.id, 'username': self.username, 'email': self.email, 'phone': self.phone, 'role': self.role, 'membership': self.membership, 'membership_plan': self.membership_plan, 'membership_expires': self.membership_expires.strftime('%Y-%m-%d') if self.membership_expires else None, 'premium_used': self.premium_used, 'premium_limit': self.premium_limit}
 
 class Lesson(db.Model):
     __tablename__ = 'lessons'

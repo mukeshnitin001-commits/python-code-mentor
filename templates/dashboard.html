@@ -9,9 +9,24 @@
 <div class="stats">
   <div class="stat-card">
     <div class="stat-value">{{ completed_count }}/{{ total_lessons }}</div>
-    <div class="stat-label">Lessons completed</div>
+    <div class="stat-label">Lessons completed (free)</div>
     <div class="progress"><div class="progress-bar" style="width: {{ pct }}%"></div></div>
   </div>
+</div>
+
+<div class="panel member-card" style="margin-top: 1.25rem;">
+  {% if is_member %}
+    <div class="member-head">
+      <span class="badge badge-admin">👑 {{ 'Annual' if user.membership_plan == 'annual' else 'Monthly' }} Member</span>
+      <span class="muted small">Unlimited AI features · expires {{ user.membership_expires.strftime('%Y-%m-%d') }}</span>
+    </div>
+  {% else %}
+    <div class="member-head">
+      <span class="badge badge-student">🎟️ Free Trial</span>
+      <span class="muted">Lessons are <strong>free</strong>. You have <strong>{{ remaining }}/5</strong> premium uses left (Explain · Compare · Code Review).</span>
+      <a href="{{ url_for('pricing') }}" class="btn btn-primary btn-sm">⭐ Upgrade to Member</a>
+    </div>
+  {% endif %}
 </div>
 
 <div class="grid-2">

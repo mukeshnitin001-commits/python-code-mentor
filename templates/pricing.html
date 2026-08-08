@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Membership{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>⭐ Membership Plans</h1>
+  <p class="muted">Lessons are <strong>free</strong> for all registered users. Members unlock <strong>unlimited</strong> AI features: Explain My Code, Compare Styles &amp; Code Review.</p>
+</div>
+
+<div class="pricing-grid">
+  <div class="panel pricing-card">
+    <h3>🎟️ Free (Trial)</h3>
+    <div class="price">₹0<span class="muted">/forever</span></div>
+    <ul class="plain-list">
+      <li>✅ All 30 lessons — free</li>
+      <li>✅ Quiz &amp; progress tracking</li>
+      <li>✅ Playground</li>
+      <li>🎁 <strong>5</strong> premium uses (Explain / Compare / Code Review)</li>
+    </ul>
+    {% if user and not is_member %}<span class="badge badge-student">Current plan</span>{% endif %}
+  </div>
+
+  <div class="panel pricing-card featured">
+    <h3>👑 Monthly Member</h3>
+    <div class="price">₹99<span class="muted">/month</span></div>
+    <ul class="plain-list">
+      <li>✅ Everything in Free</li>
+      <li>♾️ <strong>Unlimited</strong> Explain My Code</li>
+      <li>♾️ <strong>Unlimited</strong> Compare Styles</li>
+      <li>♾️ <strong>Unlimited</strong> Code Review</li>
+      <li>💎 Priority AI responses</li>
+    </ul>
+    {% if user and is_member and user.membership_plan == 'monthly' %}<span class="badge badge-admin">Active</span>{% endif %}
+  </div>
+
+  <div class="panel pricing-card featured">
+    <h3>🏆 Annual Member</h3>
+    <div class="price">₹799<span class="muted">/year <em>(save 33%)</em></span></div>
+    <ul class="plain-list">
+      <li>✅ Everything in Monthly</li>
+      <li>♾️ Unlimited AI features</li>
+      <li>🎁 2 months free vs monthly</li>
+      <li>💎 Priority AI responses</li>
+    </ul>
+    {% if user and is_member and user.membership_plan == 'annual' %}<span class="badge badge-admin">Active</span>{% endif %}
+  </div>
+</div>
+
+{% if user %}
+  {% if is_member %}
+    <p class="muted center">You're a {{ user.membership_plan }} member — all AI features unlocked until {{ user.membership_expires.strftime('%Y-%m-%d') }}. 🎉</p>
+  {% else %}
+    <p class="muted center">To become a member, contact the administrator to activate your paid plan (monthly ₹99 / annual ₹799).</p>
+  {% endif %}
+{% else %}
+  <p class="muted center"><a href="{{ url_for('register') }}">Register free</a> to get lessons + 5 premium trials, then upgrade.</p>
+{% endif %}
+{% endblock %}

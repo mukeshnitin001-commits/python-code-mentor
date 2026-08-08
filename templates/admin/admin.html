@@ -42,7 +42,7 @@
 
   <h3>👥 Users ({{ users|length }})</h3>
     <table class="table">
-      <thead><tr><th>User</th><th>Email</th><th>Phone</th><th>Role</th><th>Actions</th></tr></thead>
+      <thead><tr><th>User</th><th>Email</th><th>Phone</th><th>Role</th><th>Membership</th><th>Actions</th></tr></thead>
       <tbody>
       {% for u in users %}
         <tr>
@@ -50,7 +50,23 @@
           <td class="small">{{ u.email or '—' }}</td>
           <td class="small">{{ u.phone or '—' }}</td>
           <td>{{ u.role }}</td>
+          <td>
+            {% if u.membership == 'premium' %}
+              <span class="badge badge-admin">👑 {{ 'Annual' if u.membership_plan == 'annual' else 'Monthly' }}<br><small>{{ u.membership_expires.strftime('%Y-%m-%d') }}</small></span>
+            {% else %}
+              <span class="badge badge-student">Trial {{ u.premium_used }}/{{ u.premium_limit }}</span>
+            {% endif %}
+          </td>
           <td class="row-gap-sm">
+            <form method="post" action="{{ url_for('user_membership', user_id=u.id) }}" class="inline-form">
+              <select name="action" class="input-xs">
+                <option value="grant_monthly">+ Monthly</option>
+                <option value="grant_annual">+ Annual</option>
+                <option value="revoke">Revoke</option>
+                <option value="reset_trial">Reset trial</option>
+              </select>
+              <button class="btn btn-ghost btn-xs">Apply</button>
+            </form>
             <form method="post" action="{{ url_for('user_toggle', user_id=u.id) }}">
               <button class="btn btn-ghost btn-xs">Make {{ 'Student' if u.role=='admin' else 'Admin' }}</button>
             </form>

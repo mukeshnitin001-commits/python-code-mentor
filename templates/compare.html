@@ -63,7 +63,14 @@ function runCompare() {
     body: JSON.stringify({code})
   }).then(r => r.json()).then(d => {
     load.classList.add('hidden');
-    if (d.error) { out.innerHTML = '<p class="error">' + d.error + '</p>'; return; }
+    if (d.error) {
+      if (d.membership_required) {
+        out.innerHTML = '<div class="trial-limit"><h3>🎟️ Free trial limit reached</h3><p>' + d.error + '</p><a href="{{ url_for('pricing') }}" class="btn btn-primary">⭐ Upgrade to Member</a></div>';
+      } else {
+        out.innerHTML = '<p class="error">' + d.error + '</p>';
+      }
+      return;
+    }
     const note = d.note ? '<div class="compare-note">💡 ' + d.note + '</div>' : '';
     out.innerHTML = note + `
       <div class="style-row">

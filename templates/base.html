@@ -22,6 +22,7 @@
       <a href="{{ url_for('learn') }}?quiz=1">Quiz</a>
       {% if user %}
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        {% if user.role != 'admin' %}<a href="{{ url_for('pricing') }}" class="upgrade-link">⭐ Upgrade</a>{% endif %}
         {% if user.role == 'admin' %}<a href="{{ url_for('admin') }}" class="admin-link">Admin</a>{% endif %}
         <a href="{{ url_for('change_password') }}">Change Password</a>
         <a href="{{ url_for('logout') }}" class="btn btn-ghost">Logout ({{ user.email or user.username }})</a>

@@ -1,6 +1,7 @@
 import os
 import json
 import re
+from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from models import db, User, Lesson, LessonProgress, CodeSnippet, CodeStyle, StyleExample, Question, QuizAttempt, seed_data
@@ -53,6 +54,36 @@ def admin_required(f):
 def current_user():
     uid = session.get('user_id')
     return User.query.get(uid) if uid else None
+
+# ---------- Membership / trial helpers ----------
+def membership_active(user):
+    # True if user has an active paid membership (or is admin)
+    if not user:
+        return False
+    if user.role == 'admin':
+        return True
+    if user.membership == 'premium' and user.membership_expires:
+        return user.membership_expires > datetime.utcnow()
+    return False
+
+def premium_remaining(user):
+    # Remaining premium/trial uses. -1 means unlimited (member/admin)
+    if membership_active(user):
+        return -1
+    limit = user.premium_limit if user.premium_limit is not None else 5
+    return max(0, limit - (user.premium_used or 0))
+
+def premium_allowed(user):
+    remaining = premium_remaining(user)
+    if remaining == -1:
+        return True, -1
+    return remaining > 0, remaining
+
+def consume_premium(user):
+    # Record one premium use (only counts for non-members)
+    if not membership_active(user):
+        user.premium_used = (user.premium_used or 0) + 1
+        db.session.commit()
 
 # ---------- Routes ----------
 @app.route('/')
@@ -184,6 +215,7 @@ def change_password():
 
 # ---------- Lessons / Learning ----------
 @app.route('/learn')
+@login_required
 def learn():
     lessons = Lesson.query.order_by(Lesson.order).all()
     progress = {}
@@ -225,9 +257,13 @@ def api_explain():
     code = data.get('code', '')
     if not code.strip():
         return jsonify({'error': 'Please paste some code first.'}), 400
+    allowed, remaining = premium_allowed(current_user())
+    if not allowed:
+        return jsonify({'error': 'Free trial limit reached (5 uses). Become a member for unlimited access.', 'membership_required': True, 'remaining': 0}), 402
     try:
         explanation = explain_code(code)
-        return jsonify({'explanation': explanation})
+        consume_premium(current_user())
+        return jsonify({'explanation': explanation, 'remaining': premium_remaining(current_user())})
     except Exception as e:
         return jsonify({'error': 'AI could not process this. Please try again. ({})'.format(e)}), 500
 
@@ -244,18 +280,32 @@ def api_compare():
     code = data.get('code', '')
     if not code.strip():
         return jsonify({'error': 'Please paste some code first.'}), 400
+    allowed, remaining = premium_allowed(current_user())
+    if not allowed:
+        return jsonify({'error': 'Free trial limit reached (5 uses). Become a member for unlimited access.', 'membership_required': True, 'remaining': 0}), 402
     try:
         result = compare_styles(code)
+        consume_premium(current_user())
+        result['remaining'] = premium_remaining(current_user())
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': 'AI could not process this. Please try again. ({})'.format(e)}), 500
 
-# ---------- Code Review Platform (public: anyone can use, no login) ----------
+# ---------- Membership / Pricing ----------
+@app.route('/pricing')
+def pricing():
+    return render_template('pricing.html', user=current_user())
+
+# ---------- Code Review Platform (registered users; trial-limited) ----------
 @app.route('/review')
+@login_required
 def review_page():
-    return render_template('review.html', user=current_user(), provider=get_ai_provider())
+    allowed, remaining = premium_allowed(current_user())
+    return render_template('review.html', user=current_user(), provider=get_ai_provider(),
+                           remaining=remaining, is_member=membership_active(current_user()))
 
 @app.route('/api/review', methods=['POST'])
+@login_required
 def api_review():
     data = request.get_json(silent=True) or {}
     code = data.get('code', '')
@@ -263,8 +313,13 @@ def api_review():
         return jsonify({'error': 'Please paste some code or upload a file first.'}), 400
     if len(code) > 50000:
         return jsonify({'error': 'Code is too large (max 50,000 characters).'}), 400
+    allowed, remaining = premium_allowed(current_user())
+    if not allowed:
+        return jsonify({'error': 'Free trial limit reached (5 uses). Become a member for unlimited access.', 'membership_required': True, 'remaining': 0}), 402
     try:
         result = review_code(code)
+        consume_premium(current_user())
+        result['remaining'] = premium_remaining(current_user())
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': 'Review could not be generated. Please try again. ({})'.format(e)}), 500
@@ -298,9 +353,12 @@ def dashboard():
     users = None
     if cur and cur.role == 'admin':
         users = User.query.order_by(User.created_at.desc()).all()
+    remaining = premium_remaining(cur) if cur else 0
+    is_member = membership_active(cur) if cur else False
     return render_template('dashboard.html', user=cur,
                            total_lessons=total, completed_count=done, pct=pct,
-                           recent=completed_lessons[-5:], users=users)
+                           recent=completed_lessons[-5:], users=users,
+                           remaining=remaining, is_member=is_member)
 
 
 # ---------- Code Playground (client-side Pyodide sandbox) ----------
@@ -470,6 +528,40 @@ def user_delete(user_id):
         db.session.delete(user)
         db.session.commit()
         flash('User deleted.', 'info')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/user/<int:user_id>/membership', methods=['POST'])
+@login_required
+@admin_required
+def user_membership(user_id):
+    user = User.query.get_or_404(user_id)
+    action = request.form.get('action', '')
+    if action == 'grant_monthly':
+        user.membership = 'premium'
+        user.membership_plan = 'monthly'
+        user.membership_expires = datetime.utcnow() + timedelta(days=30)
+        user.premium_used = 0
+        db.session.commit()
+        flash('Monthly membership granted to {} (expires {}).'.format(
+            user.email or user.username, user.membership_expires.strftime('%Y-%m-%d')), 'success')
+    elif action == 'grant_annual':
+        user.membership = 'premium'
+        user.membership_plan = 'annual'
+        user.membership_expires = datetime.utcnow() + timedelta(days=365)
+        user.premium_used = 0
+        db.session.commit()
+        flash('Annual membership granted to {} (expires {}).'.format(
+            user.email or user.username, user.membership_expires.strftime('%Y-%m-%d')), 'success')
+    elif action == 'revoke':
+        user.membership = 'none'
+        user.membership_plan = None
+        user.membership_expires = None
+        db.session.commit()
+        flash('Membership revoked for {}.'.format(user.email or user.username), 'info')
+    elif action == 'reset_trial':
+        user.premium_used = 0
+        db.session.commit()
+        flash('Trial counter reset for {}.'.format(user.email or user.username), 'info')
     return redirect(url_for('admin'))
 
 @app.route('/admin/user/<int:user_id>/reset-password', methods=['POST'])
