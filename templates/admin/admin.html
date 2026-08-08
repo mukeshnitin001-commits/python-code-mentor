@@ -54,6 +54,10 @@
             <form method="post" action="{{ url_for('user_toggle', user_id=u.id) }}">
               <button class="btn btn-ghost btn-xs">Make {{ 'Student' if u.role=='admin' else 'Admin' }}</button>
             </form>
+            <form method="post" action="{{ url_for('user_reset_password', user_id=u.id) }}" class="inline-form">
+              <input type="password" name="new_password" placeholder="new pass" required minlength="4" class="input-xs">
+              <button class="btn btn-ghost btn-xs" title="Reset this user's password">Reset PW</button>
+            </form>
             <form method="post" action="{{ url_for('user_delete', user_id=u.id) }}" onsubmit="return confirm('Delete user {{ u.username }}?');">
               <button class="btn btn-danger btn-xs">Delete</button>
             </form>

@@ -112,15 +112,36 @@ def login():
         identity = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         # Users can log in with either their username or their email
-        user = User.query.filter((User.username == identity) | (User.email == identity)).first()
+        # Student portal: email login. Admins use the separate admin portal.
+        user = User.query.filter((User.email == identity) | (User.username == identity)).first()
         if user and user.check_password(password):
+            if user.role == 'admin':
+                flash('Admins log in through the Admin portal.', 'warning')
+                return redirect(url_for('admin_login'))
+            session.clear()
             session['user_id'] = user.id
             session['username'] = user.username
-            session['is_admin'] = (user.role == 'admin')
-            flash('Welcome back, {}!'.format(user.username), 'success')
+            session['is_admin'] = False
+            flash('Welcome back, {}!'.format(user.email or user.username), 'success')
             return redirect(url_for('dashboard'))
         flash('Invalid email or password.', 'danger')
     return render_template('login.html', user=current_user())
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password) and user.role == 'admin':
+            session.clear()
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['is_admin'] = True
+            flash('Welcome back, Admin {}!'.format(user.username), 'success')
+            return redirect(url_for('admin'))
+        flash('Invalid admin credentials.', 'danger')
+    return render_template('admin/login.html', user=current_user())
 
 @app.route('/logout')
 def logout():
@@ -416,6 +437,20 @@ def user_delete(user_id):
         db.session.delete(user)
         db.session.commit()
         flash('User deleted.', 'info')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/user/<int:user_id>/reset-password', methods=['POST'])
+@login_required
+@admin_required
+def user_reset_password(user_id):
+    user = User.query.get_or_404(user_id)
+    new_pass = request.form.get('new_password', '').strip()
+    if len(new_pass) < 4:
+        flash('New password must be at least 4 characters.', 'danger')
+    else:
+        user.set_password(new_pass)
+        db.session.commit()
+        flash('Password reset for {} (new password: {}).'.format(user.email or user.username, new_pass), 'success')
     return redirect(url_for('admin'))
 
 # Initialize schema at import time so it runs on serverless cold starts

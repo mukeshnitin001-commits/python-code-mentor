@@ -25,8 +25,9 @@
         <a href="{{ url_for('change_password') }}">Change Password</a>
         <a href="{{ url_for('logout') }}" class="btn btn-ghost">Logout ({{ user.email or user.username }})</a>
       {% else %}
-        <a href="{{ url_for('login') }}" class="btn btn-ghost">Login</a>
+        <a href="{{ url_for('login') }}" class="btn btn-ghost">Student Login</a>
         <a href="{{ url_for('register') }}" class="btn btn-primary">Get Started</a>
+        <a href="{{ url_for('admin_login') }}" class="admin-link">Admin</a>
       {% endif %}
     </nav>
   </header>
