@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from models import db, User, Lesson, LessonProgress, CodeSnippet, CodeStyle, StyleExample, Question, QuizAttempt, seed_data
@@ -61,25 +62,47 @@ def index():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip().lower()
+        phone = re.sub(r'[^0-9]', '', request.form.get('phone', '').strip())
         password = request.form.get('password', '')
-        role = request.form.get('role', 'student')
-        if not username or not password:
-            flash('Username and password required.', 'danger')
+        confirm = request.form.get('confirm_password', '')
+
+        # Valid email is compulsory
+        if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+            flash('Please enter a valid email address.', 'danger')
             return redirect(url_for('register'))
-        if email and User.query.filter_by(email=email).first():
-            flash('Email already registered.', 'danger')
+
+        # Contact number is compulsory (7-15 digits after stripping non-numeric)
+        if not phone or len(phone) < 7 or len(phone) > 15:
+            flash('Please enter a valid contact number (7-15 digits).', 'danger')
             return redirect(url_for('register'))
-        if User.query.filter_by(username=username).first():
-            flash('Username already taken.', 'danger')
+
+        if not password or len(password) < 4:
+            flash('Password must be at least 4 characters.', 'danger')
             return redirect(url_for('register'))
-        user = User(username=username, email=email or None,
-                    role=role if role in ('student', 'admin') else 'student')
+        if password != confirm:
+            flash('Passwords do not match.', 'danger')
+            return redirect(url_for('register'))
+
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered. Please log in.', 'danger')
+            return redirect(url_for('register'))
+        if User.query.filter_by(phone=phone).first():
+            flash('Contact number already registered.', 'danger')
+            return redirect(url_for('register'))
+
+        # Username is generated automatically from the email (kept internal)
+        base = (email.split('@')[0][:30] or 'user').lower()
+        username, i = base, 1
+        while User.query.filter_by(username=username).first():
+            i += 1
+            username = '{}{}'.format(base, i)
+
+        user = User(username=username, email=email, phone=phone, role='student')
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
-        flash('Account created! Please log in.', 'success')
+        flash('Account created! Please log in with your email.', 'success')
         return redirect(url_for('login'))
     return render_template('register.html', user=current_user())
 
@@ -96,7 +119,7 @@ def login():
             session['is_admin'] = (user.role == 'admin')
             flash('Welcome back, {}!'.format(user.username), 'success')
             return redirect(url_for('dashboard'))
-        flash('Invalid email/username or password.', 'danger')
+        flash('Invalid email or password.', 'danger')
     return render_template('login.html', user=current_user())
 
 @app.route('/logout')
@@ -403,6 +426,11 @@ with app.app_context():
     # (db.create_all won't alter existing tables, e.g. old /tmp SQLite or Postgres).
     try:
         db.session.execute(db.text('ALTER TABLE users ADD COLUMN email VARCHAR(200)'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()  # column already exists
+    try:
+        db.session.execute(db.text('ALTER TABLE users ADD COLUMN phone VARCHAR(20)'))
         db.session.commit()
     except Exception:
         db.session.rollback()  # column already exists

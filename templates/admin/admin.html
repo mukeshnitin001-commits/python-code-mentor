@@ -42,12 +42,13 @@
 
   <h3>👥 Users ({{ users|length }})</h3>
     <table class="table">
-      <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead>
+      <thead><tr><th>User</th><th>Email</th><th>Phone</th><th>Role</th><th>Actions</th></tr></thead>
       <tbody>
       {% for u in users %}
         <tr>
           <td>{{ u.username }}</td>
           <td class="small">{{ u.email or '—' }}</td>
+          <td class="small">{{ u.phone or '—' }}</td>
           <td>{{ u.role }}</td>
           <td class="row-gap-sm">
             <form method="post" action="{{ url_for('user_toggle', user_id=u.id) }}">

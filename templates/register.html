@@ -3,22 +3,19 @@
 {% block content %}
 <div class="auth-card">
   <h2>Create your account 🚀</h2>
-  <p class="muted">Free forever. Track your progress across the A-to-Z path.</p>
+  <p class="muted">Register with your email and contact number to start learning.</p>
   <form method="post" class="form">
-    <label>Username
-      <input type="text" name="username" required autofocus>
+    <label>Email <span class="req">*</span>
+      <input type="email" name="email" placeholder="you@example.com" required autofocus>
     </label>
-    <label>Email (optional, used for login)
-      <input type="email" name="email" placeholder="you@example.com">
+    <label>Contact Number <span class="req">*</span>
+      <input type="tel" name="phone" placeholder="e.g. 9876543210" required pattern="[0-9+()\- ]{7,20}" title="Enter a valid contact number">
     </label>
-    <label>Password
+    <label>Password <span class="req">*</span>
       <input type="password" name="password" required minlength="4">
     </label>
-    <label>Role
-      <select name="role">
-        <option value="student">Student</option>
-        <option value="admin">Admin</option>
-      </select>
+    <label>Confirm Password <span class="req">*</span>
+      <input type="password" name="confirm_password" required minlength="4">
     </label>
     <button type="submit" class="btn btn-primary btn-block">Sign Up</button>
   </form>
