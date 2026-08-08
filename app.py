@@ -294,7 +294,104 @@ def api_compare():
 # ---------- Membership / Pricing ----------
 @app.route('/pricing')
 def pricing():
-    return render_template('pricing.html', user=current_user())
+    return render_template('pricing.html', user=current_user(),
+                           payments_enabled=bool(os.environ.get('STRIPE_SECRET_KEY')),
+                           is_member=membership_active(current_user()) if current_user() else False)
+
+# ---------- Stripe self-service payments ----------
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+PAYMENTS_ENABLED = bool(STRIPE_SECRET_KEY)
+
+PLANS = {
+    'monthly': {'price': 9900, 'label': 'Monthly Member', 'days': 30},
+    'annual': {'price': 79900, 'label': 'Annual Member', 'days': 365},
+}
+
+def _grant_membership(user, plan):
+    user.membership = 'premium'
+    user.membership_plan = plan
+    user.membership_expires = datetime.utcnow() + timedelta(days=PLANS[plan]['days'])
+    user.premium_used = 0
+    db.session.commit()
+
+@app.route('/checkout/<plan>', methods=['POST'])
+@login_required
+def checkout(plan):
+    if not PAYMENTS_ENABLED:
+        flash('Online payments are being configured. Ask the admin to activate your membership for now.', 'warning')
+        return redirect(url_for('pricing'))
+    if plan not in PLANS:
+        flash('Unknown plan.', 'danger')
+        return redirect(url_for('pricing'))
+    user = current_user()
+    try:
+        import stripe
+        stripe.api_key = STRIPE_SECRET_KEY
+        base = request.host_url.rstrip('/')
+        s = stripe.checkout.Session.create(
+            mode='payment',
+            client_reference_id=str(user.id),
+            customer_email=(user.email or ''),
+            line_items=[{
+                'price_data': {
+                    'currency': 'inr',
+                    'product_data': {'name': PLANS[plan]['label'] + ' - Python Code Mentor'},
+                    'unit_amount': PLANS[plan]['price'],
+                },
+                'quantity': 1,
+            }],
+            metadata={'plan': plan},
+            success_url=base + url_for('payment_success', session_id='{CHECKOUT_SESSION_ID}'),
+            cancel_url=base + url_for('pricing'),
+        )
+        return redirect(s.url)
+    except Exception as e:
+        flash('Payment could not be started: {}'.format(e), 'danger')
+        return redirect(url_for('pricing'))
+
+@app.route('/payment-success')
+@login_required
+def payment_success():
+    session_id = request.args.get('session_id', '')
+    plan = None
+    if PAYMENTS_ENABLED and session_id:
+        try:
+            import stripe
+            stripe.api_key = STRIPE_SECRET_KEY
+            cs = stripe.checkout.Session.retrieve(session_id)
+            if cs.get('payment_status') == 'paid':
+                plan = (cs.get('metadata') or {}).get('plan') or 'monthly'
+        except Exception:
+            plan = None
+    if plan in PLANS:
+        _grant_membership(current_user(), plan)
+        flash('🎉 Payment received! {} activated. Enjoy unlimited AI features!'.format(PLANS[plan]['label']), 'success')
+    else:
+        flash('Payment could not be verified. If you were charged, contact the admin.', 'warning')
+    return redirect(url_for('dashboard'))
+
+@app.route('/stripe/webhook', methods=['POST'])
+def stripe_webhook():
+    if not PAYMENTS_ENABLED or not STRIPE_WEBHOOK_SECRET:
+        return jsonify({'ok': False, 'error': 'webhook not configured'}), 400
+    import stripe
+    payload = request.get_data()
+    sig = request.headers.get('Stripe-Signature', '')
+    try:
+        stripe.api_key = STRIPE_SECRET_KEY
+        event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
+    except Exception:
+        return jsonify({'ok': False}), 400
+    if event.get('type') == 'checkout.session.completed':
+        s = event.get('data', {}).get('object', {})
+        uid = s.get('client_reference_id')
+        plan = (s.get('metadata') or {}).get('plan') or 'monthly'
+        if uid and plan in PLANS:
+            user = User.query.get(int(uid))
+            if user:
+                _grant_membership(user, plan)
+    return jsonify({'ok': True})
 
 # ---------- Code Review Platform (registered users; trial-limited) ----------
 @app.route('/review')

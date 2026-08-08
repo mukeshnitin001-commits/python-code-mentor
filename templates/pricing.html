@@ -29,7 +29,14 @@
       <li>♾️ <strong>Unlimited</strong> Code Review</li>
       <li>💎 Priority AI responses</li>
     </ul>
-    {% if user and is_member and user.membership_plan == 'monthly' %}<span class="badge badge-admin">Active</span>{% endif %}
+    {% if user and is_member and user.membership_plan == 'monthly' %}<span class="badge badge-admin">Active</span>
+    {% elif payments_enabled and user %}
+      <form method="post" action="{{ url_for('checkout', plan='monthly') }}">
+        <button class="btn btn-primary">💳 Subscribe — ₹99/month</button>
+      </form>
+    {% else %}
+      <p class="muted small">Online payments coming soon — contact admin to activate.</p>
+    {% endif %}
   </div>
 
   <div class="panel pricing-card featured">
@@ -41,7 +48,14 @@
       <li>🎁 2 months free vs monthly</li>
       <li>💎 Priority AI responses</li>
     </ul>
-    {% if user and is_member and user.membership_plan == 'annual' %}<span class="badge badge-admin">Active</span>{% endif %}
+    {% if user and is_member and user.membership_plan == 'annual' %}<span class="badge badge-admin">Active</span>
+    {% elif payments_enabled and user %}
+      <form method="post" action="{{ url_for('checkout', plan='annual') }}">
+        <button class="btn btn-primary">💳 Subscribe — ₹799/year</button>
+      </form>
+    {% else %}
+      <p class="muted small">Online payments coming soon — contact admin to activate.</p>
+    {% endif %}
   </div>
 </div>
 
@@ -49,7 +63,11 @@
   {% if is_member %}
     <p class="muted center">You're a {{ user.membership_plan }} member — all AI features unlocked until {{ user.membership_expires.strftime('%Y-%m-%d') }}. 🎉</p>
   {% else %}
-    <p class="muted center">To become a member, contact the administrator to activate your paid plan (monthly ₹99 / annual ₹799).</p>
+    {% if payments_enabled %}
+      <p class="muted center">Choose a plan above and pay securely by card (UPI/cards/wallets via Stripe). Membership activates instantly.</p>
+    {% else %}
+      <p class="muted center">To become a member, contact the administrator to activate your paid plan (monthly ₹99 / annual ₹799).</p>
+    {% endif %}
   {% endif %}
 {% else %}
   <p class="muted center"><a href="{{ url_for('register') }}">Register free</a> to get lessons + 5 premium trials, then upgrade.</p>
