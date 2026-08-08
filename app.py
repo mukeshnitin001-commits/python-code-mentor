@@ -24,8 +24,9 @@ db.init_app(app)
 def ensure_default_admin():
     admin_user = os.environ.get('ADMIN_USERNAME', 'admin')
     admin_pass = os.environ.get('ADMIN_PASSWORD', 'admin123')
+    admin_email = os.environ.get('ADMIN_EMAIL', 'admin@codementor.local')
     if not User.query.filter_by(username=admin_user).first():
-        u = User(username=admin_user, role='admin')
+        u = User(username=admin_user, email=admin_email, role='admin')
         u.set_password(admin_pass)
         db.session.add(u)
         db.session.commit()
@@ -61,15 +62,20 @@ def index():
 def register():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         role = request.form.get('role', 'student')
         if not username or not password:
             flash('Username and password required.', 'danger')
             return redirect(url_for('register'))
+        if email and User.query.filter_by(email=email).first():
+            flash('Email already registered.', 'danger')
+            return redirect(url_for('register'))
         if User.query.filter_by(username=username).first():
             flash('Username already taken.', 'danger')
             return redirect(url_for('register'))
-        user = User(username=username, role=role if role in ('student', 'admin') else 'student')
+        user = User(username=username, email=email or None,
+                    role=role if role in ('student', 'admin') else 'student')
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
@@ -80,16 +86,17 @@ def register():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
+        identity = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-        user = User.query.filter_by(username=username).first()
+        # Users can log in with either their username or their email
+        user = User.query.filter((User.username == identity) | (User.email == identity)).first()
         if user and user.check_password(password):
             session['user_id'] = user.id
             session['username'] = user.username
             session['is_admin'] = (user.role == 'admin')
             flash('Welcome back, {}!'.format(user.username), 'success')
             return redirect(url_for('dashboard'))
-        flash('Invalid username or password.', 'danger')
+        flash('Invalid email/username or password.', 'danger')
     return render_template('login.html', user=current_user())
 
 @app.route('/logout')
@@ -97,6 +104,30 @@ def logout():
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
+
+# ---------- Password change (any logged-in user; admins too) ----------
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current = request.form.get('current_password', '')
+        new_pass = request.form.get('new_password', '')
+        confirm = request.form.get('confirm_password', '')
+        user = current_user()
+        if not user.check_password(current):
+            flash('Current password is incorrect.', 'danger')
+            return redirect(url_for('change_password'))
+        if len(new_pass) < 4:
+            flash('New password must be at least 4 characters.', 'danger')
+            return redirect(url_for('change_password'))
+        if new_pass != confirm:
+            flash('New passwords do not match.', 'danger')
+            return redirect(url_for('change_password'))
+        user.set_password(new_pass)
+        db.session.commit()
+        flash('Password updated successfully!', 'success')
+        return redirect(url_for('dashboard'))
+    return render_template('change_password.html', user=current_user())
 
 # ---------- Lessons / Learning ----------
 @app.route('/learn')
@@ -368,6 +399,13 @@ def user_delete(user_id):
 # before the first request (essential for Postgres on Vercel).
 with app.app_context():
     db.create_all()
+    # Lightweight migration: add the email column if it doesn't exist yet
+    # (db.create_all won't alter existing tables, e.g. old /tmp SQLite or Postgres).
+    try:
+        db.session.execute(db.text('ALTER TABLE users ADD COLUMN email VARCHAR(200)'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()  # column already exists
     seed_data()
     ensure_default_admin()
 

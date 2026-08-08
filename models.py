@@ -10,6 +10,7 @@ class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(200), unique=True, nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), default='student')  # student | admin
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -21,7 +22,7 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
-        return {'id': self.id, 'username': self.username, 'role': self.role}
+        return {'id': self.id, 'username': self.username, 'email': self.email, 'role': self.role}
 
 class Lesson(db.Model):
     __tablename__ = 'lessons'
