@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Code Review{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>🔍 Code Review</h1>
+  <p class="muted">Paste or <strong>upload a code file</strong> and get a professional review: score, comments, suggestions, algorithm analysis, and a <strong>publication / production readiness</strong> verdict. Open to everyone — no login needed. Powered by a free LLM ({{ provider }}) with offline fallback.</p>
+</div>
+
+<div class="ai-grid">
+  <div class="panel">
+    <label class="field-label" for="code">Your Code</label>
+    <textarea id="code" class="code-input" rows="12" placeholder="# Paste your code here, or upload a .py file below&#10;def fibonacci(n):&#10;    if n <= 1:&#10;        return n&#10;    return fibonacci(n-1) + fibonacci(n-2)&#10;&#10;print(fibonacci(10))"></textarea>
+    <div class="upload-row">
+      <label class="btn btn-ghost btn-sm file-btn">
+        📂 Upload File (.py, .txt)
+        <input type="file" id="fileInput" accept=".py,.txt,.js,.java,.c,.cpp,.go,.rb,.php" style="display:none">
+      </label>
+      <span id="file-name" class="muted small">No file selected</span>
+    </div>
+    <div class="row-gap">
+      <button class="btn btn-primary" onclick="runReview()">🚀 Review My Code</button>
+      <button class="btn btn-ghost" onclick="loadSample()">Load Sample</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <label class="field-label">Review Report</label>
+    <div id="review-output" class="output-box">
+      <p class="muted">Your review report will appear here — score, comments, suggestions, algorithm analysis &amp; verdict…</p>
+    </div>
+    <div id="review-loading" class="loading hidden">🧠 Analyzing… checking logic, efficiency, security &amp; production-readiness…</div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const SAMPLES = [
+`# Recursive Fibonacci — clear but inefficient
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+print(fibonacci(35))`,
+`# User login simulation
+def login():
+    username = input("Username: ")
+    password = input("Password: ")
+    if username == "admin" and password == "admin123":
+        print("Access granted")
+    else:
+        print("Access denied")
+
+login()`,
+`# Well-structured data processing
+import json
+from typing import List, Dict
+
+def load_orders(path: str) -> List[Dict]:
+    """Load order records from a JSON file."""
+    with open(path) as f:
+        return json.load(f)
+
+def total_revenue(orders: List[Dict]) -> float:
+    return sum(o.get("amount", 0.0) for o in orders)
+
+orders = load_orders("orders.json")
+print(f"Total revenue: {total_revenue(orders)}")`
+];
+let sIdx = 0;
+function loadSample() {
+  document.getElementById('code').value = SAMPLES[sIdx % SAMPLES.length];
+  sIdx++;
+}
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  document.getElementById('file-name').textContent = f.name + ' (' + f.size + ' bytes)';
+  const reader = new FileReader();
+  reader.onload = ev => { document.getElementById('code').value = ev.target.result; };
+  reader.readAsText(f);
+});
+function runReview() {
+  const code = document.getElementById('code').value;
+  if (!code.trim()) { alert('Please paste some code or upload a file first.'); return; }
+  const out = document.getElementById('review-output');
+  const load = document.getElementById('review-loading');
+  out.innerHTML = ''; load.classList.remove('hidden');
+  fetch('/api/review', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({code})
+  }).then(r => r.json()).then(d => {
+    load.classList.add('hidden');
+    if (d.error) { out.innerHTML = '<p class="error">' + d.error + '</p>'; return; }
+    out.innerHTML = renderReport(d);
+  }).catch(() => {
+    load.classList.add('hidden');
+    out.innerHTML = '<p class="error">Request failed. Please try again.</p>';
+  });
+}
+function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function verdictBadge(v){
+  const map = {'production-ready':['✅ Production Ready','badge-done'], 'needs-work':['⚠️ Needs Work','badge-warn'], 'not-ready':['❌ Not Ready','badge-danger']};
+  const m = map[v] || [v || 'Reviewed', 'badge'];
+  return '<span class="badge ' + m[1] + '">' + m[0] + '</span>';
+}
+function renderReport(d) {
+  let h = '';
+  // Verdict + score
+  h += '<div class="review-verdict">' + verdictBadge(d.verdict) + ' <span class="review-score">' + (d.score ?? '—') + '/100</span></div>';
+  if (d.verdict_summary) h += '<p class="muted small">' + esc(d.verdict_summary) + '</p>';
+  // Categories
+  if (d.categories) {
+    h += '<h4 class="review-h">Category Scores</h4><div class="cat-grid">';
+    const names = {correctness:'Correctness', readability:'Readability', efficiency:'Efficiency', maintainability:'Maintainability', security:'Security'};
+    for (const k in names) {
+      const v = d.categories[k];
+      if (v === undefined) continue;
+      const color = v >= 80 ? 'var(--green)' : v >= 60 ? '#facc15' : '#ef4444';
+      h += '<div class="cat"><div class="cat-top"><span>' + names[k] + '</span><b>' + v + '</b></div>' +
+           '<div class="progress"><div class="progress-bar" style="width:' + v + '%;background:' + color + '"></div></div></div>';
+    }
+    h += '</div>';
+  }
+  // Strengths
+  if (d.strengths && d.strengths.length) {
+    h += '<h4 class="review-h">💪 Strengths</h4><ul class="plain-list">';
+    d.strengths.forEach(s => h += '<li>✅ ' + esc(s) + '</li>');
+    h += '</ul>';
+  }
+  // Comments
+  if (d.comments && d.comments.length) {
+    h += '<h4 class="review-h">💬 Review Comments</h4><ul class="plain-list">';
+    d.comments.forEach(c => h += '<li>🔍 ' + esc(c) + '</li>');
+    h += '</ul>';
+  }
+  // Suggestions
+  if (d.suggestions && d.suggestions.length) {
+    h += '<h4 class="review-h">🛠️ Suggestions</h4><ul class="plain-list">';
+    d.suggestions.forEach(s => h += '<li>💡 ' + esc(s) + '</li>');
+    h += '</ul>';
+  }
+  // Algorithm
+  if (d.algorithm) {
+    h += '<h4 class="review-h">🧮 Algorithm Analysis</h4>' +
+         '<p class="algo"><b>Time:</b> <code>' + esc(d.algorithm.time_complexity) + '</code> &nbsp;|&nbsp; <b>Space:</b> <code>' + esc(d.algorithm.space_complexity) + '</code></p>';
+    if (d.algorithm.notes) h += '<p class="muted small">' + esc(d.algorithm.notes) + '</p>';
+  }
+  return h || '<p class="muted">No report generated.</p>';
+}
+</script>
+{% endblock %}

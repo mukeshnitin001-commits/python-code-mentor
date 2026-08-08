@@ -4,7 +4,7 @@ import re
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from models import db, User, Lesson, LessonProgress, CodeSnippet, CodeStyle, StyleExample, Question, QuizAttempt, seed_data
-from ai_engine import explain_code, compare_styles, get_ai_provider
+from ai_engine import explain_code, compare_styles, review_code, get_ai_provider
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-prod')
@@ -249,6 +249,25 @@ def api_compare():
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': 'AI could not process this. Please try again. ({})'.format(e)}), 500
+
+# ---------- Code Review Platform (public: anyone can use, no login) ----------
+@app.route('/review')
+def review_page():
+    return render_template('review.html', user=current_user(), provider=get_ai_provider())
+
+@app.route('/api/review', methods=['POST'])
+def api_review():
+    data = request.get_json(silent=True) or {}
+    code = data.get('code', '')
+    if not code.strip():
+        return jsonify({'error': 'Please paste some code or upload a file first.'}), 400
+    if len(code) > 50000:
+        return jsonify({'error': 'Code is too large (max 50,000 characters).'}), 400
+    try:
+        result = review_code(code)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': 'Review could not be generated. Please try again. ({})'.format(e)}), 500
 
 @app.route('/snippet', methods=['POST'])
 @login_required

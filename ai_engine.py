@@ -38,6 +38,24 @@ def _build_prompt(kind, code):
             "in a Python code block. Also add a 'note' explaining the difference in one short paragraph.\n\n"
             "TASK/CODE:\n```python\n" + code + "\n```"
         )
+    elif kind == 'review':
+        return (
+            "You are a senior code reviewer and software architect. Review the following code as if "
+            "the author wants to publish it or ship it to production.\n"
+            "Return STRICT JSON only, with EXACTLY these keys:\n"
+            "- \"score\": integer 0-100 overall quality score\n"
+            "- \"categories\": object with 0-100 scores for each of: correctness, readability, "
+            "efficiency, maintainability, security\n"
+            "- \"comments\": array of short strings, line-specific review comments (quote line numbers, "
+            "e.g. 'Line 7: ...'). If no issues, use empty array.\n"
+            "- \"suggestions\": array of short strings with concrete improvement suggestions\n"
+            "- \"algorithm\": object with keys time_complexity (string), space_complexity (string), "
+            "and notes (string) describing the algorithm used and its complexity\n"
+            "- \"verdict\": one of \"production-ready\", \"needs-work\", or \"not-ready\"\n"
+            "- \"verdict_summary\": one sentence explaining the verdict\n"
+            "- \"strengths\": array of short strings listing what the code does well\n\n"
+            "CODE:\n```python\n" + code + "\n```"
+        )
     return None
 
 
@@ -149,3 +167,128 @@ def compare_styles(code):
         return {'procedural': code, 'modern': code,
                 'note': "AI generated an answer but it wasn't valid JSON. Showcasing your original code above."}
     return _fallback_compare(code)
+
+
+# ---- Offline rule-based code review (always works) ----
+
+def _fallback_review(code):
+    """Static-analysis based review: no network needed."""
+    lines = code.splitlines()
+    total = len(lines)
+    n_functions = len(re.findall(r'^\s*def\s+', code, re.M))
+    n_classes = len(re.findall(r'^\s*class\s+', code, re.M))
+    n_comments = len(re.findall(r'^\s*#', code, re.M))
+    n_docstrings = code.count('"""') // 2
+
+    comments, suggestions, strengths = [], [], []
+
+    # ---- Issue detection ----
+    if re.search(r'\beval\(|\bexec\(', code):
+        comments.append("Security: eval()/exec() on untrusted input can execute arbitrary code.")
+        suggestions.append("Replace eval()/exec() with safe alternatives (ast.literal_eval, dedicated parsing).")
+    if re.search(r'password\s*=|api[_-]?key\s*=|secret\s*=', code, re.I):
+        comments.append("Possible hardcoded secret/password detected — never commit credentials.")
+        suggestions.append("Move secrets to environment variables or a secrets manager.")
+    if re.search(r'except\s*:', code):
+        comments.append("Bare 'except:' swallows all errors silently, hiding bugs.")
+        suggestions.append("Catch specific exceptions (e.g. except ValueError) and log the error.")
+    if re.search(r'def\s+\w+\([^)]*=\[\]', code) or re.search(r'def\s+\w+\([^)]*=\{\}', code) or re.search(r'def\s+\w+\([^)]*=\{\}', code):
+        comments.append("Mutable default argument (e.g. =[] or ={}) is shared across calls — classic bug.")
+        suggestions.append("Use None as default and create the mutable inside the function.")
+    if re.search(r'\bprint\(', code) and re.search(r'def\s+', code):
+        suggestions.append("Replace debugging print() with logging (logging module) before shipping.")
+    if re.search(r'\bTODO\b|\bFIXME\b|\bXXX\b', code, re.I):
+        comments.append("Unresolved TODO/FIXME markers found in the code.")
+    if re.search(r'\bglobal\s+', code):
+        suggestions.append("Minimize 'global' usage — prefer passing values or classes.")
+    if re.search(r'input\(', code):
+        suggestions.append("Validate and sanitize all user input before use.")
+    if re.search(r'\bopen\(', code) and 'with' not in code:
+        comments.append("File opened without a context manager ('with') — resource may leak.")
+        suggestions.append("Use 'with open(...) as f:' to auto-close files.")
+
+    # Nested-loop complexity
+    indents = [len(l) - len(l.lstrip()) for l in lines if l.strip()]
+    max_depth = max(indents) if indents else 0
+    depth = max_depth // 4
+    if depth >= 2:
+        suggestions.append("Deep nesting detected — consider extracting inner logic into helper functions.")
+
+    # ---- Strengths ----
+    if n_docstrings:
+        strengths.append(f"Good documentation: {n_docstrings} docstring section(s).")
+    if n_comments >= max(1, total // 10):
+        strengths.append("Code is well-commented.")
+    if n_functions:
+        strengths.append(f"Code is organized into {n_functions} function(s).")
+    if total <= 60:
+        strengths.append("Code is compact and easy to scan.")
+
+    # ---- Score computation (heuristic) ----
+    score = 75
+    deductions = 0
+    if re.search(r'\beval\(|\bexec\(', code): deductions += 15
+    if re.search(r'except\s*:', code): deductions += 10
+    if re.search(r'password\s*=|api[_-]?key\s*=|secret\s*=', code, re.I): deductions += 12
+    if re.search(r'def\s+\w+\([^)]*=\[\]|def\s+\w+\([^)]*=\{\}', code): deductions += 8
+    if depth >= 2: deductions += 6
+    if not n_functions and total > 20: deductions += 5
+    if not n_comments and total > 15: deductions += 4
+    score = max(10, min(99, score - deductions))
+
+    cats = {
+        'correctness': max(40, min(98, score + 5)),
+        'readability': max(40, min(98, score + (5 if n_comments or n_docstrings else -5))),
+        'efficiency': max(40, min(98, score - (8 if depth >= 2 else 0))),
+        'maintainability': max(40, min(98, score + (5 if n_functions else -5))),
+        'security': max(40, min(98, score - (12 if ('eval(' in code or 'exec(' in code or 'password=' in code.lower()) else 0))),
+    }
+
+    # Complexity heuristic
+    if depth >= 2 or len(re.findall(r'\bfor\s+', code)) >= 2:
+        tc, sc = "O(n^2) (or worse)", "O(n) (auxiliary)"
+        alg_note = "Nested iteration detected — watch for quadratic growth on large inputs."
+    elif len(re.findall(r'\bfor\s+|\bwhile\s+', code)) >= 1:
+        tc, sc = "O(n)", "O(1)"
+        alg_note = "Single pass over the input — linear time, constant extra space."
+    else:
+        tc, sc = "O(1)", "O(1)"
+        alg_note = "No explicit loops — constant time unless hidden inside library calls."
+
+    if score >= 80:
+        verdict, summary = "production-ready", "Solid code with minor polish; suitable for publication/production."
+    elif score >= 60:
+        verdict, summary = "needs-work", "Decent foundation, but fix the flagged issues before shipping."
+    else:
+        verdict, summary = "not-ready", "Significant issues found — address them before publication."
+
+    if not comments:
+        comments.append("No critical issues auto-detected. (Offline review — connect the free LLM for deeper analysis.)")
+
+    return {
+        'score': score,
+        'categories': cats,
+        'comments': comments[:8],
+        'suggestions': suggestions[:8] or ["No suggestions in offline mode — try the AI review for richer advice."],
+        'algorithm': {'time_complexity': tc, 'space_complexity': sc, 'notes': alg_note},
+        'verdict': verdict,
+        'verdict_summary': summary,
+        'strengths': strengths[:6] or ["No obvious strengths auto-detected."],
+    }
+
+
+def review_code(code):
+    """Review code for publication/production readiness. Returns dict."""
+    text, err = _groq_http(code, 'review')
+    if text:
+        try:
+            start = text.find('{')
+            end = text.rfind('}')
+            if start != -1 and end != -1:
+                data = json.loads(text[start:end + 1])
+                if isinstance(data, dict) and 'score' in data:
+                    return data
+        except Exception:
+            pass
+    return _fallback_review(code)
+

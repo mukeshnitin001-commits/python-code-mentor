@@ -181,3 +181,18 @@ a:hover{text-decoration:underline}
 .phone-row select{flex:0 0 auto;max-width:180px;padding:10px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-size:14px}
 .phone-row input{flex:1 1 auto;min-width:0}
 .hint{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+
+/* Code Review platform */
+.review-link{color:#f472b6;font-weight:600}
+.upload-row{display:flex;align-items:center;gap:10px;margin:10px 0}
+.file-btn{display:inline-block;cursor:pointer}
+.review-verdict{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.review-score{font-size:26px;font-weight:800;color:var(--text)}
+.review-h{margin:14px 0 6px;font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.cat-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px}
+.cat-top b{color:var(--text)}
+.cat .progress{height:6px}
+.algo code{background:var(--bg2);padding:2px 8px;border-radius:6px;border:1px solid var(--border)}
+.badge-warn{background:rgba(250,204,21,.15);color:#facc15;border-color:#facc15}
+.badge-danger{background:rgba(239,68,68,.15);color:#ef4444;border-color:#ef4444}
