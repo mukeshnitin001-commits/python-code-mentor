@@ -63,6 +63,7 @@ def index():
 def register():
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
+        country_code = re.sub(r'[^0-9]', '', request.form.get('country_code', '').strip())
         phone = re.sub(r'[^0-9]', '', request.form.get('phone', '').strip())
         password = request.form.get('password', '')
         confirm = request.form.get('confirm_password', '')
@@ -72,10 +73,18 @@ def register():
             flash('Please enter a valid email address.', 'danger')
             return redirect(url_for('register'))
 
-        # Contact number is compulsory (7-15 digits after stripping non-numeric)
+        # Country code is compulsory (1-4 digits, e.g. 91, 1, 44)
+        if not country_code or len(country_code) > 4:
+            flash('Please select a valid country code.', 'danger')
+            return redirect(url_for('register'))
+
+        # Local contact number is compulsory (7-15 digits after stripping non-numeric)
         if not phone or len(phone) < 7 or len(phone) > 15:
             flash('Please enter a valid contact number (7-15 digits).', 'danger')
             return redirect(url_for('register'))
+
+        # Full international number is stored with the country code (e.g. +919876543210)
+        full_phone = '+' + country_code + phone
 
         if not password or len(password) < 4:
             flash('Password must be at least 4 characters.', 'danger')
@@ -87,8 +96,8 @@ def register():
         if User.query.filter_by(email=email).first():
             flash('Email already registered. Please log in.', 'danger')
             return redirect(url_for('register'))
-        if User.query.filter_by(phone=phone).first():
-            flash('Contact number already registered.', 'danger')
+        if User.query.filter_by(phone=full_phone).first():
+            flash('This contact number is already registered.', 'danger')
             return redirect(url_for('register'))
 
         # Username is generated automatically from the email (kept internal)
@@ -98,7 +107,7 @@ def register():
             i += 1
             username = '{}{}'.format(base, i)
 
-        user = User(username=username, email=email, phone=phone, role='student')
+        user = User(username=username, email=email, phone=full_phone, role='student')
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
